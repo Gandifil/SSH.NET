@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Linq;
 using Renci.SshNet.Abstractions;
 using Renci.SshNet.Security.Cryptography;
+using System.IO;
 #if FEATURE_TAP
 using System.Threading.Tasks;
 #endif
@@ -150,6 +151,10 @@ namespace Renci.SshNet
         private HashAlgorithm _serverMac;
 
         private HashAlgorithm _clientMac;
+
+        private bool _serverMacETM;
+
+        private bool _clientMacETM;
 
         private Cipher _clientCipher;
 
@@ -1013,7 +1018,7 @@ namespace Renci.SshNet
             DiagnosticAbstraction.Log(string.Format("[{0}] Sending message '{1}' to server: '{2}'.", ToHex(SessionId), message.GetType().Name, message));
 
             var paddingMultiplier = _clientCipher == null ? (byte) 8 : Math.Max((byte) 8, _serverCipher.MinimumSize);
-            var packetData = message.GetPacket(paddingMultiplier, _clientCompression);
+            var packetData = message.GetPacket(paddingMultiplier, _clientCompression, _clientMacETM);
 
             // take a write lock to ensure the outbound packet sequence number is incremented
             // atomically, and only after the packet has actually been sent
@@ -1022,7 +1027,7 @@ namespace Renci.SshNet
                 byte[] hash = null;
                 var packetDataOffset = 4; // first four bytes are reserved for outbound packet sequence
 
-                if (_clientMac != null)
+                if (_clientMac != null && !_clientMacETM)
                 {
                     // write outbound packet sequence to start of packet data
                     Pack.UInt32ToBigEndian(_outboundPacketSequence, packetData);
@@ -1043,16 +1048,37 @@ namespace Renci.SshNet
                 }
 
                 var packetLength = packetData.Length - packetDataOffset;
+
+                if (_clientMac != null && _clientMacETM)
+                {
+                    var data = new byte[4 + 4  + packetLength];
+                    Pack.UInt32ToBigEndian(_outboundPacketSequence, data);
+                    Pack.UInt32ToBigEndian((uint)packetLength, data, 4);
+                    Buffer.BlockCopy(packetData, packetDataOffset, data, 8, packetLength);
+                    hash = _clientMac.ComputeHash(data);
+                }
+
                 if (hash == null)
                 {
                     SendPacket(packetData, packetDataOffset, packetLength);
                 }
                 else
                 {
-                    var data = new byte[packetLength + hash.Length];
-                    Buffer.BlockCopy(packetData, packetDataOffset, data, 0, packetLength);
-                    Buffer.BlockCopy(hash, 0, data, packetLength, hash.Length);
-                    SendPacket(data, 0, data.Length);
+                    if (_clientMacETM)
+                    {
+                        var data = new byte[4 + packetLength + hash.Length];
+                        Pack.UInt32ToBigEndian((uint)packetLength, data);
+                        Buffer.BlockCopy(packetData, packetDataOffset, data, 4, packetLength);
+                        Buffer.BlockCopy(hash, 0, data, 4 + packetLength, hash.Length);
+                        SendPacket(data, 0, data.Length);
+                    }
+                    else
+                    {
+                        var data = new byte[packetLength + hash.Length];
+                        Buffer.BlockCopy(packetData, packetDataOffset, data, 0, packetLength);
+                        Buffer.BlockCopy(hash, 0, data, packetLength, hash.Length);
+                        SendPacket(data, 0, data.Length);
+                    }
                 }
 
                 // increment the packet sequence number only after we're sure the packet has
@@ -1165,7 +1191,7 @@ namespace Renci.SshNet
                     return null;
                 }
 
-                if (_serverCipher != null)
+                if (_serverCipher != null && !_serverMacETM)
                 {
                     firstBlock = _serverCipher.Decrypt(firstBlock);
                 }
@@ -1208,13 +1234,28 @@ namespace Renci.SshNet
             }
 #endif // FEATURE_SOCKET_POLL
 
+            // validate message against MAC
+            if (_serverMac != null && _serverMacETM)
+            {
+                var clientHash = _serverMac.ComputeHash(data, 0, data.Length - serverMacLength);
+                var serverHash = data.Take(data.Length - serverMacLength, serverMacLength);
+
+                // TODO add IsEqualTo overload that takes left+right index and number of bytes to compare;
+                // TODO that way we can eliminate the extra allocation of the Take above
+                if (!serverHash.IsEqualTo(clientHash))
+                {
+                    throw new SshConnectionException("MAC error", DisconnectReason.MacError);
+                }
+            }
+
             if (_serverCipher != null)
             {
-                var numberOfBytesToDecrypt = data.Length - (blockSize + inboundPacketSequenceLength + serverMacLength);
+                var numberOfBytesToDecrypt = data.Length - ((_serverMacETM ? packetLengthFieldLength : blockSize) + inboundPacketSequenceLength + serverMacLength);
+                var startIndexForDecrypt = (_serverMacETM ? packetLengthFieldLength : blockSize) + inboundPacketSequenceLength;
                 if (numberOfBytesToDecrypt > 0)
                 {
-                    var decryptedData = _serverCipher.Decrypt(data, blockSize + inboundPacketSequenceLength, numberOfBytesToDecrypt);
-                    Buffer.BlockCopy(decryptedData, 0, data, blockSize + inboundPacketSequenceLength, decryptedData.Length);
+                    var decryptedData = _serverCipher.Decrypt(data, startIndexForDecrypt, numberOfBytesToDecrypt);
+                    Buffer.BlockCopy(decryptedData, 0, data, startIndexForDecrypt, decryptedData.Length);
                 }
             }
 
@@ -1223,7 +1264,7 @@ namespace Renci.SshNet
             var messagePayloadOffset = inboundPacketSequenceLength + packetLengthFieldLength + paddingLengthFieldLength;
 
             // validate message against MAC
-            if (_serverMac != null)
+            if (_serverMac != null && !_serverMacETM)
             {
                 var clientHash = _serverMac.ComputeHash(data, 0, data.Length - serverMacLength);
                 var serverHash = data.Take(data.Length - serverMacLength, serverMacLength);
@@ -1435,6 +1476,8 @@ namespace Renci.SshNet
             _clientCipher = _keyExchange.CreateClientCipher();
             _serverMac = _keyExchange.CreateServerHash();
             _clientMac = _keyExchange.CreateClientHash();
+            _serverMacETM = _keyExchange.IsServerHashETM();
+            _clientMacETM = _keyExchange.IsClientHashETM();
             _clientCompression = _keyExchange.CreateCompressor();
             _serverDecompression = _keyExchange.CreateDecompressor();
 

@@ -92,5 +92,16 @@ namespace Renci.SshNet.Security
         /// The compression method to inflate data.
         /// </returns>
         Compressor CreateDecompressor();
+
+        /// <summary>
+        /// etm
+        /// </summary>
+        /// <returns></returns>
+        bool IsServerHashETM();
+        /// <summary>
+        /// etm
+        /// </summary>
+        /// <returns></returns>
+        bool IsClientHashETM();
     }
 }

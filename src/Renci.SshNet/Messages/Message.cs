@@ -48,7 +48,7 @@ namespace Renci.SshNet.Messages
             }
         }
 
-        internal byte[] GetPacket(byte paddingMultiplier, Compressor compressor)
+        internal byte[] GetPacket(byte paddingMultiplier, Compressor compressor, bool isETM = false)
         {
             const int outboundPacketSequenceSize = 4;
 
@@ -64,7 +64,7 @@ namespace Renci.SshNet.Messages
                 // * 4 bytes for the outbound packet sequence
                 // * 4 bytes for the packet data length
                 // * one byte for the packet padding length
-                sshDataStream.Seek(outboundPacketSequenceSize + 4 + 1, SeekOrigin.Begin);
+                sshDataStream.Seek(outboundPacketSequenceSize + (isETM ? 0 : 4) + 1, SeekOrigin.Begin);
 
                 if (compressor != null)
                 {
@@ -84,9 +84,9 @@ namespace Renci.SshNet.Messages
                     WriteBytes(sshDataStream);
                 }
 
-                messageLength = (int) sshDataStream.Length - (outboundPacketSequenceSize + 4 + 1);
+                messageLength = (int) sshDataStream.Length - (outboundPacketSequenceSize + (isETM ? 0 : 4) + 1);
 
-                var packetLength = messageLength + 4 + 1;
+                var packetLength = messageLength + (isETM ? 0 : 4) + 1;
 
                 // determine the padding length
                 var paddingLength = GetPaddingLength(paddingMultiplier, packetLength);
@@ -102,14 +102,15 @@ namespace Renci.SshNet.Messages
                 sshDataStream.Seek(outboundPacketSequenceSize, SeekOrigin.Begin);
 
                 // add packet data length
-                sshDataStream.Write(packetDataLength);
+                if (!isETM)
+                    sshDataStream.Write(packetDataLength);
 
                 //  add packet padding length
                 sshDataStream.WriteByte(paddingLength);
             }
             else
             {
-                var packetLength = messageLength + 4 + 1;
+                var packetLength = messageLength + (isETM ? 0 : 4) + 1; //(isETM ? 0 : 4) 
 
                 // determine the padding length
                 var paddingLength = GetPaddingLength(paddingMultiplier, packetLength);
@@ -123,7 +124,8 @@ namespace Renci.SshNet.Messages
                 sshDataStream.Seek(outboundPacketSequenceSize, SeekOrigin.Begin);
 
                 // add packet data length
-                sshDataStream.Write(packetDataLength);
+                if (!isETM)
+                    sshDataStream.Write(packetDataLength);
 
                 //  add packet padding length
                 sshDataStream.WriteByte(paddingLength);

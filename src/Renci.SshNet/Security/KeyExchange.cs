@@ -251,6 +251,23 @@ namespace Renci.SshNet.Security
             //return clientHMac;
             return _clientHashInfo.HashAlgorithm(clientKey);
         }
+        /// <summary>
+        /// Get ETM mode for client hash algorithm.
+        /// </summary>
+        /// <returns>ETM</returns>
+        public bool IsServerHashETM()
+        {
+            return _serverHashInfo.IsETM;
+        }
+
+        /// <summary>
+        /// Get ETM mode for client hash algorithm.
+        /// </summary>
+        /// <returns>ETM</returns>
+        public bool IsClientHashETM()
+        {
+            return _clientHashInfo.IsETM;
+        }
 
         /// <summary>
         /// Creates the compression algorithm to use to deflate data.
