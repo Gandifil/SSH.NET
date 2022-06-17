@@ -6,7 +6,6 @@ before_build:
 build:
   project: src\Renci.SshNet.VS2019.sln
   verbosity: minimal
-  publish_nuget: true
 
 test_script:
 - cmd: >-
