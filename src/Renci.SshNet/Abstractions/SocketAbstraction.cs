@@ -65,7 +65,11 @@ namespace Renci.SshNet.Abstractions
 #if FEATURE_TAP
         public static Task ConnectAsync(Socket socket, IPEndPoint remoteEndpoint, CancellationToken cancellationToken)
         {
+#if NET6_0
+            return socket.ConnectAsync(remoteEndpoint, cancellationToken).AsTask();
+#else
             return socket.ConnectAsync(remoteEndpoint, cancellationToken);
+#endif
         }
 #endif
 
