@@ -8,8 +8,8 @@
 		<MSBuildTasksPackageId>MSBuildTasks</MSBuildTasksPackageId>
 		<MSBuildTasksPackageVersion>1.5.0.214</MSBuildTasksPackageVersion>
 	</PropertyGroup>
-	
-	<ItemGroup>
+
+  <ItemGroup Condition="'$(VisualStudioSuffix)' == '2015'">
 		<VisualStudioVersionClassic Include="2012">
 			<SolutionFile>$(MSBuildThisFileDirectory)..\src\Renci.SshNet.VS2012.sln</SolutionFile>
 			<ToolsVersion>14.0</ToolsVersion>
@@ -21,54 +21,45 @@
 			<VisualStudioVersion>14.0</VisualStudioVersion>
 		</VisualStudioVersionClassic>
 	</ItemGroup>
-	
-	<ItemGroup>
+
+  <ItemGroup Condition="'$(VisualStudioSuffix)' == '2019'">
 		<VisualStudioVersionModern Include="2019">
 			<SolutionFile>$(MSBuildThisFileDirectory)..\src\Renci.SshNet.VS2019.sln</SolutionFile>
 			<VisualStudioVersion>16.0</VisualStudioVersion>
 		</VisualStudioVersionModern>
 	</ItemGroup>
 
-	<ItemGroup>
-		<TargetFrameworkClassic Include="Windows Phone Silverlight 7.1">
-			<OutputDirectory>Renci.SshNet.WindowsPhone\bin\$(Configuration)</OutputDirectory>
-			<Moniker>wp71</Moniker>
-		</TargetFrameworkClassic>
-		<TargetFrameworkClassic Include="Windows Phone Silverlight 8.0">
-			<OutputDirectory>Renci.SshNet.WindowsPhone8\bin\$(Configuration)</OutputDirectory>
-			<Moniker>wp8</Moniker>
-		</TargetFrameworkClassic>
-		<TargetFrameworkClassic Include="Silverlight 4">
-			<OutputDirectory>Renci.SshNet.Silverlight\bin\$(Configuration)</OutputDirectory>
-			<Moniker>sl4</Moniker>
-		</TargetFrameworkClassic>
-		<TargetFrameworkClassic Include="Silverlight 5">
-			<OutputDirectory>Renci.SshNet.Silverlight5\bin\$(Configuration)</OutputDirectory>
-			<Moniker>sl5</Moniker>
-		</TargetFrameworkClassic>
-		<TargetFrameworkClassic Include="Universal Windows Platform 10">
-			<OutputDirectory>Renci.SshNet.UAP10\bin\$(Configuration)</OutputDirectory>
-			<Moniker>uap10</Moniker>
-		</TargetFrameworkClassic>
-	</ItemGroup>
+  <ItemGroup Condition="'$(VisualStudioSuffix)' == '2022'">
+    <VisualStudioVersionModern Include="2022">
+      <SolutionFile>$(MSBuildThisFileDirectory)..\src\Renci.SshNet.VS2022.sln</SolutionFile>
+      <VisualStudioVersion>17.0</VisualStudioVersion>
+    </VisualStudioVersionModern>
+  </ItemGroup>
 
 	<ItemGroup>
-		<TargetFrameworkModern Include=".NET Framework 3.5">
-			<OutputDirectory>Renci.SshNet\bin\$(Configuration)\net35</OutputDirectory>
-			<Moniker>net35</Moniker>
+    <TargetFrameworkModern Include=".NET Framework 4.7.2">
+      <OutputDirectory>Renci.SshNet\bin\$(Configuration)\net472</OutputDirectory>
+      <Moniker>net472</Moniker>
+    </TargetFrameworkModern>
+    <TargetFrameworkModern Include=".NETStandard 1.3">
+      <OutputDirectory>Renci.SshNet\bin\$(Configuration)\netstandard1.3</OutputDirectory>
+      <Moniker>netstandard1.3</Moniker>
+    </TargetFrameworkModern>
+    <TargetFrameworkModern Include=".NETStandard 2.0">
+      <OutputDirectory>Renci.SshNet\bin\$(Configuration)\netstandard2.0</OutputDirectory>
+      <Moniker>netstandard2.0</Moniker>
+    </TargetFrameworkModern>
+  </ItemGroup>
+
+  <ItemGroup>
+		<TargetFrameworkModern Include=".NET 5.0">
+			<OutputDirectory>Renci.SshNet\bin\$(Configuration)\net5.0</OutputDirectory>
+			<Moniker>net5.0</Moniker>
 		</TargetFrameworkModern>
-		<TargetFrameworkModern Include=".NET Framework 4.0">
-			<OutputDirectory>Renci.SshNet\bin\$(Configuration)\net40</OutputDirectory>
-			<Moniker>net40</Moniker>
-		</TargetFrameworkModern>
-		<TargetFrameworkModern Include=".NETStandard 1.3">
-			<OutputDirectory>Renci.SshNet\bin\$(Configuration)\netstandard1.3</OutputDirectory>
-			<Moniker>netstandard1.3</Moniker>
-		</TargetFrameworkModern>
-		<TargetFrameworkModern Include=".NETStandard 2.0">
-			<OutputDirectory>Renci.SshNet\bin\$(Configuration)\netstandard2.0</OutputDirectory>
-			<Moniker>netstandard2.0</Moniker>
-		</TargetFrameworkModern>
+    <TargetFrameworkModern Include=".NET 6.0">
+      <OutputDirectory>Renci.SshNet\bin\$(Configuration)\net6.0</OutputDirectory>
+      <Moniker>net6.0</Moniker>
+    </TargetFrameworkModern>
 	</ItemGroup>
 	
 	<Target Name="CleanClassic" DependsOnTargets="CleanSolutionClassic">
@@ -129,9 +120,9 @@
 		<MSBuild Projects="@(ProjectToBuild)" ToolsVersion="%(VisualStudioVersionModern.ToolsVersion)" Targets="Rebuild"/>
 	</Target>
 	
-	<Target Name="Package" DependsOnTargets="CreateNuGetPackage;CreateBinPackage;GenerateHelpFile"/>
-	
-	<Target Name="ValidatePackage" DependsOnTargets="ValidatePackageClassic;ValidatePackageModern"/>
+	<Target Name="PackageClassic" DependsOnTargets="ValidatePackageClassic;CreateNuGetPackage;CreateBinPackage;GenerateHelpFile"/>
+
+  <Target Name="PackageModern" DependsOnTargets="ValidatePackageModern;CreateNuGetPackage;CreateBinPackage;GenerateHelpFile"/>
 	
 	<Target Name="ValidatePackageClassic" DependsOnTargets="CheckNuGetPackageDirectory" Outputs="%(TargetFrameworkClassic.Identity)">
 		<Error Text="The 'Renci.SshNet.dll' file is not available for %(TargetFrameworkClassic.Identity) in $(NuGetPackageDirectory)\lib\%(TargetFrameworkClassic.Moniker)." Condition="!Exists('$(NuGetPackageDirectory)\lib\%(TargetFrameworkClassic.Moniker)\Renci.SshNet.dll')"/>
@@ -143,7 +134,7 @@
 		<Error Text="The 'Renci.SshNet.xml' file is not available for %(TargetFrameworkModern.Identity) in $(NuGetPackageDirectory)\lib\%(TargetFrameworkModern.Moniker)." Condition="!Exists('$(NuGetPackageDirectory)\lib\%(TargetFrameworkModern.Moniker)\Renci.SshNet.xml')"/>
 	</Target>
 	
-	<Target Name="CreateNuGetPackage" DependsOnTargets="ValidatePackage;CheckNuGetPackageDirectory;CheckReleaseVersion">
+	<Target Name="CreateNuGetPackage" DependsOnTargets="CheckNuGetPackageDirectory;CheckReleaseVersion">
 		<Exec Command="$(NuGetExe) pack $(MSBuildThisFileDirectory)nuget\SSH.NET.nuspec -OutputDirectory &quot;$(MSBuildThisFileDirectory)target&quot; -Version &quot;$(ReleaseVersion)&quot; -Properties &quot;copyright=2012-$([System.DateTime]::Now.Year), RENCI&quot; -BasePath &quot;$(NuGetPackageDirectory)&quot; -NonInteractive"/>
 	</Target>
 	
@@ -172,7 +163,7 @@
 		<Copy SourceFiles="@(BuildOutput)" DestinationFolder="$(NuGetPackageDirectory)\lib\%(TargetFrameworkModern.Moniker)"/>
 	</Target>
 	
-	<Target Name="CreateBinPackage" DependsOnTargets="PrepareMSBuildTasksPackage;ValidatePackage;CheckReleaseVersion;CheckBinaryZipPackageDirectory">
+	<Target Name="CreateBinPackage" DependsOnTargets="PrepareMSBuildTasksPackage;CheckReleaseVersion;CheckBinaryZipPackageDirectory">
 		<ItemGroup>
 			<Files Remove="@(Files)"/>
 			<Files Include="$(NuGetPackageDirectory)\lib\**\*.*"/>
